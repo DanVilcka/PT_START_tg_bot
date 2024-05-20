@@ -1,0 +1,8 @@
+setuptools
+wheel
+regex
+python-telegram-bot==13.7
+paramiko
+python-dotenv
+pathlib
+psycopg2-binary

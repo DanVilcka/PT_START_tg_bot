@@ -1,0 +1,50 @@
+version: '3'
+services:
+  bot:
+    build: bot/
+    ports:
+      - 8000:8000
+    depends_on:
+      - postgres_primary
+  postgres_primary:
+    build: db/
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: "all replication all all password"
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    command: |
+      postgres 
+      -c wal_level=replica 
+      -c hot_standby=on
+      -c wal_log_hints=on
+      -c max_wal_senders=10 
+      -c max_replication_slots=10 
+      -c hot_standby_feedback=on
+      -c log_replication_commands=on
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  postgres_replica:
+    build: db_repl
+    ports:
+      - 5433:5432
+    environment:
+      PGUSER: repl_user
+      PGPASSWORD: repl_user
+    command: |
+      bash -c "
+      until pg_basebackup --pgdata=/var/lib/postgresql/data -R --slot=replication_slot --host=postgres_primary --port=5432
+      do
+      echo 'Waiting for primary to connect...'
+      sleep 1s
+      done
+      echo 'Backup done, starting replica...'
+      chmod 0700 /var/lib/postgresql/data
+      postgres
+      "
+    depends_on:
+      - postgres_primary
